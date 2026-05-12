@@ -7,6 +7,11 @@ export const ENABLE_TOKEN_EXCHANGE = process.env.ENABLE_TOKEN_EXCHANGE === "true
 export const defaultHomeserverUrl =
   process.env.MATRIX_HOMESERVER_URL || "https://localhost:8008/";
 
+// stdio mode: per-request headers/oauth context is unavailable.
+// MATRIX_ACCESS_TOKEN, MATRIX_USER_ID, MATRIX_HOMESERVER_URL are read from env.
+const envAccessToken = process.env.MATRIX_ACCESS_TOKEN || "";
+const envUserId = process.env.MATRIX_USER_ID || "";
+
 // OAuth/Token exchange configuration
 export const tokenExchangeConfig: TokenExchangeConfig = {
   idpUrl: process.env.IDP_ISSUER_URL || "",
@@ -47,7 +52,8 @@ export function getAccessToken(
     return oauthToken;
   }
 
-  return "";
+  // stdio fallback: MATRIX_ACCESS_TOKEN from process env
+  return envAccessToken;
 }
 
 /**
@@ -59,7 +65,7 @@ export function getMatrixContext(
   const matrixUserId =
     (Array.isArray(headers?.["matrix_user_id"])
       ? headers?.["matrix_user_id"][0]
-      : headers?.["matrix_user_id"]) || "";
+      : headers?.["matrix_user_id"]) || envUserId;
   const homeserverUrl =
     (Array.isArray(headers?.["matrix_homeserver_url"])
       ? headers?.["matrix_homeserver_url"][0]

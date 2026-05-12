@@ -1,13 +1,18 @@
 {
   "name": "matrix-mcp-server",
   "version": "1.0.0",
-  "description": "MCP server that fronts a Matrix homeserver",
+  "description": "MCP server that fronts a Matrix homeserver (stdio + HTTP modes)",
   "main": "dist/http-server.js",
   "type": "module",
+  "bin": {
+    "matrix-mcp": "dist/stdio.js"
+  },
   "scripts": {
     "start": "node dist/http-server.js",
+    "start:stdio": "node dist/stdio.js",
     "build": "tsc",
     "dev": "NODE_OPTIONS=--no-warnings tsx watch src/http-server.ts",
+    "dev:stdio": "NODE_OPTIONS=--no-warnings tsx watch src/stdio.ts",
     "lint": "eslint .",
     "test": "jest"
   },

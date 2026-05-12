@@ -152,6 +152,60 @@ export const getRoomMembersHandler = async ({ roomId }: { roomId: string }, { re
   }
 };
 
+// Tool: Get room state event(s) — needed for bridge identification (m.bridge, m.room.create, etc.)
+export const getRoomStateEventHandler = async (
+  { roomId, eventType, stateKey }: { roomId: string; eventType: string; stateKey?: string },
+  { requestInfo, authInfo }: any
+): Promise<CallToolResult> => {
+  const { matrixUserId, homeserverUrl } = getMatrixContext(requestInfo?.headers);
+  const accessToken = getAccessToken(requestInfo?.headers, authInfo?.token);
+
+  try {
+    const client = await createConfiguredMatrixClient(homeserverUrl, matrixUserId, accessToken);
+    const room = client.getRoom(roomId);
+    if (!room) {
+      return {
+        content: [{ type: "text", text: `Error: Room with ID ${roomId} not found.` }],
+        isError: true,
+      };
+    }
+
+    const key = stateKey ?? "";
+    const event = room.currentState.getStateEvents(eventType, key);
+
+    if (!event) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: `No state event of type "${eventType}" with state_key "${key}" in room ${roomId}.`,
+          },
+        ],
+      };
+    }
+
+    // Single event (when stateKey is specified) — getStateEvents returns the event or null
+    const payload = {
+      type: eventType,
+      state_key: key,
+      sender: event.getSender(),
+      origin_server_ts: event.getTs(),
+      content: event.getContent(),
+    };
+
+    return {
+      content: [{ type: "text", text: JSON.stringify(payload, null, 2) }],
+    };
+  } catch (error: any) {
+    console.error(`Failed to get room state event: ${error.message}`);
+    removeClientFromCache(matrixUserId, homeserverUrl);
+    return {
+      content: [{ type: "text", text: `Error: ${error.message}` }],
+      isError: true,
+    };
+  }
+};
+
 // Registration function
 export const registerRoomTools: ToolRegistrationFunction = (server) => {
   // Tool: List joined rooms
@@ -189,5 +243,21 @@ export const registerRoomTools: ToolRegistrationFunction = (server) => {
       },
     },
     getRoomMembersHandler
+  );
+
+  // Tool: Get room state event — needed for bridge identification via m.bridge events
+  server.registerTool(
+    "get-room-state-event",
+    {
+      title: "Get Matrix Room State Event",
+      description:
+        "Read a state event from a room by type and state_key. Useful for m.bridge (puppeting bridges like mautrix-whatsapp), m.room.create, m.room.power_levels, etc.",
+      inputSchema: {
+        roomId: z.string().describe("Matrix room ID (e.g., !roomid:domain.com)"),
+        eventType: z.string().describe('Event type, e.g., "m.bridge", "m.room.create", "m.room.power_levels"'),
+        stateKey: z.string().optional().describe('State key (default: empty string)'),
+      },
+    },
+    getRoomStateEventHandler
   );
 };
